@@ -1,0 +1,12 @@
+{
+  "name": "tesla-seat-mirror-sim",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node src/fit.test.mjs",
+    "start": "python3 -m http.server 8765"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}
