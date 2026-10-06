@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { Reflector } from "three/addons/objects/Reflector.js";
 import { CABIN, DEG, add, mul, norm, simulate, sub } from "./fit.js";
 
 const $ = (id) => document.getElementById(id);
@@ -21,13 +23,17 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.05;
+renderer.toneMappingExposure = 1.12;
 renderer.shadowMap.enabled = true;
 stage.appendChild(renderer.domElement);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMap = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+pmrem.dispose();
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9aafc0);
-scene.fog = new THREE.Fog(0x9aafc0, 14, 32);
+scene.environment = envMap;
+scene.background = new THREE.Color(0x7f93a8);
+scene.fog = new THREE.Fog(0x7f93a8, 12, 28);
 
 const camera = new THREE.PerspectiveCamera(40, 1, 0.08, 80);
 camera.up.set(0, 0, 1);
@@ -52,6 +58,9 @@ scene.add(sun);
 const cabinLight = new THREE.PointLight(0xfff1dd, 6, 6);
 cabinLight.position.set(0.15, 0, 1.2);
 scene.add(cabinLight);
+const rim = new THREE.DirectionalLight(0x8ebfff, 0.85);
+rim.position.set(-6, -4, 6);
+scene.add(rim);
 
 const paint = new THREE.MeshStandardMaterial({ color: 0xf3f0e8, roughness: 0.38, metalness: 0.04 });
 const black = new THREE.MeshStandardMaterial({ color: 0x1a1c20, roughness: 0.6 });
@@ -65,7 +74,13 @@ const glass = new THREE.MeshStandardMaterial({
 });
 const chrome = new THREE.MeshStandardMaterial({ color: 0xcfd3d8, roughness: 0.25, metalness: 0.85 });
 const seatMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.8 });
-const mirrorMat = new THREE.MeshStandardMaterial({ color: 0xb7c9d4, roughness: 0.08, metalness: 0.9 });
+const mirrorMat = new THREE.MeshStandardMaterial({
+  color: 0xd5e4ee,
+  roughness: 0.02,
+  metalness: 1,
+  envMapIntensity: 1.4,
+});
+mirrorMat.emissive = new THREE.Color(0x9fd4ff);
 const skinMat = new THREE.MeshStandardMaterial({ color: 0xd7a07a, roughness: 0.55 });
 const hairMat = new THREE.MeshStandardMaterial({ color: 0x2a211c, roughness: 0.7 });
 const shirtMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.7 });
@@ -88,6 +103,36 @@ const ground = new THREE.Mesh(
 );
 ground.receiveShadow = true;
 scene.add(ground);
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(26, 3.6),
+  new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 1 }),
+);
+road.position.set(4.2, 0, 0.003);
+road.receiveShadow = true;
+scene.add(road);
+const dashMat = new THREE.MeshStandardMaterial({ color: 0xe4dcc8, roughness: 0.55 });
+for (let i = 0; i < 9; i += 1) {
+  const dash = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.07, 0.008), dashMat);
+  dash.position.set(2.1 + i * 1.7, 0, 0.02);
+  scene.add(dash);
+}
+const chaseMat = new THREE.MeshStandardMaterial({ color: 0xb4332c, roughness: 0.48 });
+const chase = new THREE.Group();
+box(chase, 1.7, 1.5, 0.46, 0, 0, 0.4, chaseMat);
+box(chase, 0.62, 1.15, 0.26, -0.32, 0, 0.78, chaseMat);
+chase.position.set(-5.6, 0.2, 0);
+scene.add(chase);
+const postMat = new THREE.MeshStandardMaterial({ color: 0xe2a52b, roughness: 0.5 });
+for (const y of [1.75, -1.75]) {
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.95, 8), postMat);
+  post.rotation.x = Math.PI / 2;
+  post.position.set(-3.4, y, 0.48);
+  scene.add(post);
+}
+const grid = new THREE.GridHelper(24, 24, 0x9aa3ad, 0x6a727c);
+grid.rotation.x = Math.PI / 2;
+grid.position.z = 0.004;
+scene.add(grid);
 
 const car = new THREE.Group();
 scene.add(car);
@@ -96,8 +141,17 @@ box(car, 1.45, 1.76, 0.58, 1.4, 0, 0.52, paint);
 box(car, 1.25, 1.76, 0.64, -1.45, 0, 0.55, paint);
 box(car, 1.55, 1.55, 0.06, -0.05, 0, 0.24, black);
 box(car, 1.2, 1.46, 0.06, -0.08, 0, 1.36, black);
-box(car, 0.04, 0.38, 0.07, 2.12, 0.48, 0.5, chrome, false);
-box(car, 0.04, 0.38, 0.07, 2.12, -0.48, 0.5, chrome, false);
+const lampMat = new THREE.MeshStandardMaterial({
+  color: 0xfff8ee,
+  emissive: 0xffe6b0,
+  emissiveIntensity: 1.5,
+  roughness: 0.25,
+});
+box(car, 0.02, 0.22, 0.08, 2.16, 0.55, 0.58, lampMat, false);
+box(car, 0.02, 0.22, 0.08, 2.16, -0.55, 0.58, lampMat, false);
+const headLamp = new THREE.PointLight(0xfff1d0, 6, 9, 2);
+headLamp.position.set(2.4, 0, 0.62);
+scene.add(headLamp);
 box(car, 0.04, 1.35, 0.07, -2.07, 0, 0.72, tailLight, false);
 box(car, 1.4, 0.05, 0.66, -0.05, -0.88, 0.58, paint);
 box(car, 1.05, 0.025, 0.38, -0.08, -0.86, 1.12, glass, false);
@@ -133,6 +187,8 @@ car.add(wheelMesh);
 box(car, 0.06, 0.08, 0.05, CABIN.pedal.x, CABIN.pedal.y - 0.04, CABIN.pedal.z, black, false);
 box(car, 0.05, 0.07, 0.04, CABIN.pedal.x - 0.06, CABIN.pedal.y + 0.12, CABIN.pedal.z, black, false);
 
+const railMat = new THREE.MeshStandardMaterial({ color: 0x121418, emissive: 0xff3355, emissiveIntensity: 0 });
+const rail = box(car, 0.58, 0.03, 0.012, 0.08, 0.37, 0.15, railMat, false);
 const cushion = box(car, 0.48, 0.46, 0.1, 0, 0.37, 0.3, seatMat);
 const backrest = box(car, 0.46, 0.08, 0.66, 0, 0.37, 0.7, seatMat);
 box(backrest, 0.26, 0.08, 0.16, 0, 0, 0.4, seatMat);
@@ -153,10 +209,27 @@ leftMirror.position.set(leftLocal.x, leftLocal.y, leftLocal.z);
 door.add(leftMirror);
 box(door, 0.03, Math.max(0.06, leftLocal.y), 0.03, leftLocal.x, leftLocal.y / 2, leftLocal.z, black, false);
 
+let reflecting = false;
 function mirrorHead(parent) {
   const housing = box(parent, 0.2, 0.11, 0.035, 0, 0, -0.02, black, false);
   const glassPane = box(parent, 0.16, 0.085, 0.012, 0, 0, 0.012, mirrorMat, false);
-  return { housing, glassPane };
+  glassPane.visible = false;
+  const reflector = new Reflector(new THREE.PlaneGeometry(0.15, 0.078), {
+    color: 0xd5e2ea,
+    textureWidth: 512,
+    textureHeight: 256,
+    clipBias: 0.003,
+  });
+  reflector.position.z = 0.02;
+  const draw = reflector.onBeforeRender;
+  reflector.onBeforeRender = function (renderer, scene, camera) {
+    if (reflecting) return;
+    reflecting = true;
+    draw(renderer, scene, camera);
+    reflecting = false;
+  };
+  parent.add(reflector);
+  return { housing, glassPane, reflector };
 }
 mirrorHead(leftMirror);
 
@@ -205,11 +278,36 @@ for (const mesh of [pelvis, head, hairCap, hairTail, lShoe, rShoe, lEye, rEye]) 
   scene.add(mesh);
 }
 
-const scan = new THREE.Mesh(
-  new THREE.BoxGeometry(0.62, 0.62, 0.015),
-  new THREE.MeshBasicMaterial({ color: 0xff2a3c, transparent: true, opacity: 0.8 }),
+const scan = new THREE.Group();
+const scanSheet = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.72, 0.72),
+  new THREE.MeshBasicMaterial({
+    color: 0xff3355,
+    transparent: true,
+    opacity: 0.28,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  }),
 );
+scan.add(scanSheet);
+const scanLines = [];
+for (let i = 0; i < 8; i++) {
+  const line = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.68, 0.006),
+    new THREE.MeshBasicMaterial({
+      color: 0xffe4e8,
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  scan.add(line);
+  scanLines.push(line);
+}
 scene.add(scan);
+const scanLight = new THREE.PointLight(0xff2244, 0, 2.6, 2);
+scene.add(scanLight);
 
 function rayMesh(color) {
   const mesh = new THREE.Mesh(
@@ -278,7 +376,7 @@ function bend(a, b, offset) {
 function walkingPose(anthro, x, y, swing) {
   const yaw = -Math.PI / 2;
   const hipZ = anthro.shank + anthro.thigh;
-  const hip = { x, y, z: hipZ + Math.abs(swing) * 0.02 };
+  const hip = { x, y, z: hipZ + Math.abs(swing) * 0.045 };
   const torsoScale = anthro.sittingEye / (0.452 * anthro.stature);
   const chest = { x, y, z: hip.z + 0.28 * anthro.stature * torsoScale };
   const headP = { x, y, z: chest.z + anthro.head * 0.5 };
@@ -286,12 +384,12 @@ function walkingPose(anthro, x, y, swing) {
   const half = Math.min(anthro.shoulderBreadth * 0.36, 0.22);
   const lShoulder = add(chest, mul(side, half));
   const rShoulder = add(chest, mul(side, -half));
-  const lAnkle = { x: x + 0.07, y: y - swing * 0.22, z: 0.05 + Math.max(0, swing) * 0.08 };
-  const rAnkle = { x: x - 0.07, y: y + swing * 0.22, z: 0.05 + Math.max(0, -swing) * 0.08 };
-  const lKnee = { x: x + 0.07, y: (hip.y + lAnkle.y) / 2, z: hip.z * 0.48 + Math.max(0, swing) * 0.05 };
-  const rKnee = { x: x - 0.07, y: (hip.y + rAnkle.y) / 2, z: hip.z * 0.48 + Math.max(0, -swing) * 0.05 };
-  const lHand = { x: lShoulder.x, y: lShoulder.y + swing * 0.16, z: hip.z + 0.12 };
-  const rHand = { x: rShoulder.x, y: rShoulder.y - swing * 0.16, z: hip.z + 0.12 };
+  const lAnkle = { x: x + 0.08, y: y - swing * 0.34, z: 0.04 + Math.max(0, swing) * 0.14 };
+  const rAnkle = { x: x - 0.08, y: y + swing * 0.34, z: 0.04 + Math.max(0, -swing) * 0.14 };
+  const lKnee = { x: x + 0.1, y: (hip.y + lAnkle.y) / 2, z: hip.z * 0.46 + Math.max(0, swing) * 0.1 };
+  const rKnee = { x: x - 0.1, y: (hip.y + rAnkle.y) / 2, z: hip.z * 0.46 + Math.max(0, -swing) * 0.1 };
+  const lHand = { x: lShoulder.x + 0.04, y: lShoulder.y + swing * 0.28, z: hip.z + 0.08 };
+  const rHand = { x: rShoulder.x - 0.04, y: rShoulder.y - swing * 0.28, z: hip.z + 0.08 };
   return {
     yaw,
     hip,
@@ -344,14 +442,21 @@ function seatedPose(result) {
   };
 }
 
+function seatedBlend(result, motor) {
+  const design = seatedPose({ seat: DESIGN.seat, anthro: result.anthro });
+  if (motor <= 0) return design;
+  if (motor >= 1) return seatedPose(result);
+  return lerpJoints(design, seatedPose(result), motor, motor);
+}
+
 function poseAt(t, result) {
   const walkU = smooth(t, 0.15, 2.8);
   const y = 2.55 + (1.22 - 2.55) * walkU;
-  const swing = Math.sin(t * 7) * (1 - walkU);
+  const swing = Math.sin(t * 8.5) * (1 - walkU);
   const standing = walkingPose(result.anthro, 0.05, y, swing);
   if (t <= 2.8) return standing;
   const atDoor = walkingPose(result.anthro, 0.05, 1.22, 0);
-  const sitting = seatedPose(result);
+  const sitting = seatedBlend(result, t >= 6.4 ? smooth(t, 7.8, 9.2) : 0);
   if (t >= 6.4) return sitting;
   const u = (t - 2.8) / (6.4 - 2.8);
   const drop = Math.min(1, u / 0.42);
@@ -373,6 +478,14 @@ function lerpJoints(a, b, slide, drop) {
 }
 
 function applyPose(pose, anthro) {
+  if (time > 6.4) {
+    const breath = Math.sin(time * 1.7) * 0.012;
+    pose = {
+      ...pose,
+      chest: { ...pose.chest, z: pose.chest.z + breath },
+      head: { ...pose.head, z: pose.head.z + breath * 0.55 },
+    };
+  }
   const s = anthro.stature / 1.75;
   const arm = 0.038 * s;
   const leg = 0.058 * s;
@@ -494,6 +607,11 @@ function fill() {
   const errEl = $("out-error");
   errEl.textContent = `${err.toFixed(3)}°`;
   errEl.className = err < 0.01 ? "ok" : "warn";
+  const base = Object.fromEntries(DESIGN.mirrors.map((m) => [m.id, m]));
+  const signed = (n) => `${n > 0 ? "+" : ""}${n.toFixed(2)}°`;
+  $("out-delta-left").textContent = signed(byId.left.panDeg - base.left.panDeg);
+  $("out-delta-right").textContent = signed(byId.right.panDeg - base.right.panDeg);
+  $("out-delta-rear").textContent = signed(byId.rearview.tiltDeg - base.rearview.tiltDeg);
   const lines = [
     `eye ${vec(seat.eye)}`,
     `hip ${vec(seat.hip)}`,
@@ -520,25 +638,72 @@ function onChange() {
 }
 
 let driverView = false;
+let cinematic = true;
 let time = 0;
 let playing = true;
 let last = performance.now();
 
+const SHOTS = [
+  { t: 0, pos: [1.15, 6.6, 1.7], look: [0.05, 2.4, 1.15] },
+  { t: 2.7, pos: [1.45, 3.05, 1.28], look: [0.3, 1.05, 0.95] },
+  { t: 4.8, pos: [0.35, 2.25, 1.55], look: [0.12, 0.42, 0.9] },
+  { t: 7.4, pos: [1.45, 1.7, 1.48], look: [0.02, 0.37, 0.95] },
+  { t: 9.3, pos: [0.7, 1.15, 1.38], look: [-0.05, 0.37, 1.15] },
+  { t: 11.6, pos: [2.7, 3.5, 1.9], look: [0.12, 0.12, 0.95] },
+  { t: 12.6, pos: [3.3, 4.5, 2.15], look: [0.1, 0.05, 0.72] },
+];
+
+function shotAt(t) {
+  let i = 0;
+  while (i < SHOTS.length - 2 && t > SHOTS[i + 1].t) i += 1;
+  const a = SHOTS[i];
+  const b = SHOTS[i + 1];
+  const u = smooth(t, a.t, b.t);
+  const mix = (p, q) => p + (q - p) * u;
+  return {
+    pos: [mix(a.pos[0], b.pos[0]), mix(a.pos[1], b.pos[1]), mix(a.pos[2], b.pos[2])],
+    look: [mix(a.look[0], b.look[0]), mix(a.look[1], b.look[1]), mix(a.look[2], b.look[2])],
+  };
+}
+
+function applyCamera(now) {
+  if (!cinematic || driverView) return;
+  if (time < 12.6) {
+    const shot = shotAt(time);
+    camera.position.set(...shot.pos);
+    controls.target.set(...shot.look);
+    return;
+  }
+  const ang = 0.95 + Math.sin(now * 0.00016) * 0.28;
+  const radius = 5.2;
+  controls.target.set(0.1, 0.05, 0.88);
+  camera.position.set(
+    0.1 + Math.cos(ang) * radius,
+    Math.sin(ang) * radius * 0.9,
+    2.02 + Math.sin(now * 0.00028) * 0.1,
+  );
+}
+
 function update(t) {
   $("phase").textContent = phaseName(t);
-  const open = smooth(t, 2.8, 3.8) * (1 - smooth(t, 6.4, 7.6));
-  door.rotation.z = -open * 70 * DEG;
-  const seatU = smooth(t, 0.4, 2.3);
+  $("hud").classList.toggle("hot", t > 7.5 && t < 11.4);
+  const open = smooth(t, 2.8, 3.7) * (1 - smooth(t, 6.5, 7.7));
+  const bounce = Math.sin(clamp((t - 3.7) / 0.55, 0, Math.PI)) * 0.06 * (t > 3.7 && t < 4.5 ? 1 : 0);
+  door.rotation.z = -(open + bounce) * 74 * DEG;
+  const seatU = smooth(t, 7.8, 9.2);
   const hip = {
     x: DESIGN.seat.hip.x + (result.seat.hip.x - DESIGN.seat.hip.x) * seatU,
     y: result.seat.hip.y,
     z: DESIGN.seat.hip.z + (result.seat.hip.z - DESIGN.seat.hip.z) * seatU,
   };
   const recline = DESIGN.seat.recline + (result.seat.recline - DESIGN.seat.recline) * seatU;
+  rail.position.x = hip.x;
+  railMat.emissiveIntensity = seatU > 0.02 && seatU < 0.98 ? 1.2 : 0;
   placeSeat(hip, recline);
   applyPose(poseAt(t, result), result.anthro);
 
-  const aim = smooth(t, 9.2, 11.4);
+  const aim = smooth(t, 9.15, 11.35);
+  mirrorMat.emissiveIntensity = aim * (1 - aim) * 3.2;
   const doorShut = open < 0.02;
   const showRays = $("rays").checked && aim > 0.02 && doorShut;
   for (const mirror of result.mirrors) {
@@ -553,28 +718,39 @@ function update(t) {
     const pivot = mirror.pivot;
     placeLimb(bundle.sight, mirror.eye, pivot, 0.008);
     const dir = norm(sub(mirror.target, pivot));
-    const reach = Math.min(2.1, Math.hypot(mirror.target.x - pivot.x, mirror.target.y - pivot.y, mirror.target.z - pivot.z));
+    const full = Math.hypot(mirror.target.x - pivot.x, mirror.target.y - pivot.y, mirror.target.z - pivot.z);
+    const reach = Math.min(2.4, full) * (0.15 + 0.85 * aim);
     placeLimb(bundle.bounce, pivot, add(pivot, mul(dir, reach)), 0.012);
     placeLimb(bundle.normal, pivot, add(pivot, mul(solved, 0.42)), 0.01);
   }
 
-  const scanning = t > 7.65 && t < 9.25;
+  const scanning = t > 7.55 && t < 9.35;
   scan.visible = scanning;
+  scanLight.intensity = scanning ? 9 + Math.sin(t * 22) * 4 : 0;
   if (scanning) {
-    const u = clamp((t - 7.7) / 1.4, 0, 1);
-    scan.position.set(
-      result.seat.hip.x,
-      result.seat.eye.y,
-      result.seat.eye.z + (result.seat.hip.z - result.seat.eye.z) * u,
-    );
+    const u = clamp((t - 7.6) / 1.5, 0, 1);
+    const z = result.seat.eye.z + (result.seat.hip.z - result.seat.eye.z) * u;
+    scan.position.set(result.seat.hip.x, result.seat.eye.y, z);
+    scanSheet.material.opacity = 0.16 + 0.22 * (0.5 + 0.5 * Math.sin(t * 16));
+    scanLines.forEach((line, i) => {
+      const phase = (u * 3 + i / scanLines.length + t * 0.15) % 1;
+      line.position.set(0, (i - 3.5) * 0.07, (phase - 0.5) * 0.08);
+      line.material.opacity = 0.25 + 0.75 * phase;
+    });
+    scanLight.position.copy(scan.position);
   }
 }
 
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (playing && time < 12) time += dt;
+  if (playing && time < 12.6) time += dt;
   update(time);
+  if (document.activeElement !== $("time")) {
+    $("time").value = String(time);
+    $("time-val").textContent = `${time.toFixed(1)}s`;
+  }
+  applyCamera(now);
   controls.update();
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -588,17 +764,27 @@ function resize() {
   camera.updateProjectionMatrix();
 }
 
+controls.addEventListener("start", () => {
+  cinematic = false;
+});
 $("replay").onclick = () => {
   time = 0;
   playing = true;
+  cinematic = true;
+  driverView = false;
+  camera.near = 0.08;
+  camera.updateProjectionMatrix();
   last = performance.now();
 };
 $("jump").onclick = () => {
-  time = 12;
+  time = 12.6;
   playing = false;
+  cinematic = true;
+  driverView = false;
   update(time);
 };
 $("view-out").onclick = () => {
+  cinematic = false;
   driverView = false;
   camera.near = 0.08;
   camera.updateProjectionMatrix();
@@ -607,12 +793,13 @@ $("view-out").onclick = () => {
   controls.update();
 };
 $("view-eye").onclick = () => {
+  cinematic = false;
   driverView = true;
   const eye = result.seat.eye;
   camera.near = 0.02;
   camera.updateProjectionMatrix();
-  camera.position.set(eye.x, eye.y, eye.z);
-  controls.target.set(eye.x + 8, eye.y - 0.2, 0.85);
+  camera.position.set(eye.x + 0.22, eye.y, eye.z - 0.04);
+  controls.target.set(eye.x + 6, eye.y, eye.z - 0.22);
   controls.update();
 };
 for (const el of ["height", "leg", "shoulder", "seatback", "name", "hair-style"]) {
@@ -629,8 +816,15 @@ for (const button of document.querySelectorAll("[data-preset]")) {
     $("shoulder").value = preset.shoulder;
     $("seatback").value = preset.seatback;
     onChange();
+    $("replay").click();
   };
 }
+$("time").addEventListener("input", () => {
+  time = Number($("time").value);
+  playing = false;
+  $("time-val").textContent = `${time.toFixed(1)}s`;
+  update(time);
+});
 window.addEventListener("keydown", (event) => {
   if (event.target.matches("input, select")) return;
   if (event.code === "Space") {
@@ -642,4 +836,12 @@ window.addEventListener("resize", resize);
 
 onChange();
 resize();
+if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  time = 12.6;
+  playing = false;
+  cinematic = false;
+  camera.position.set(...HOME.pos);
+  controls.target.set(...HOME.target);
+  update(time);
+}
 requestAnimationFrame(frame);

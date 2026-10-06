@@ -56,6 +56,7 @@
       background: var(--red);
       vertical-align: 1px;
     }
+    #hud.hot i { box-shadow: 0 0 8px #ff2a3c; }
     aside {
       overflow: auto;
       border-left: 1px solid var(--line);
@@ -82,6 +83,10 @@
     }
     button { cursor: pointer; }
     button:hover, select:hover { border-color: #4a5160; }
+    button:focus-visible, select:focus-visible, input:focus-visible {
+      outline: 2px solid var(--red);
+      outline-offset: 2px;
+    }
     label { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; margin: 8px 0; font-size: 13px; }
     label input[type="range"] { grid-column: 1 / -1; width: 100%; }
     label output { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -131,6 +136,9 @@
         <button type="button" id="view-eye">Driver view</button>
       </div>
       <label class="check"><input type="checkbox" id="rays" checked> Show aim rays</label>
+      <label>Time <output id="time-val">0.0s</output>
+        <input id="time" type="range" min="0" max="12.6" step="0.05" value="0">
+      </label>
 
       <h2>Driver</h2>
       <input id="name" type="text" value="Alex" aria-label="Driver name">
@@ -148,6 +156,7 @@
       <label>Shoulders <output id="shoulder-val">100%</output>
         <input id="shoulder" type="range" min="0.85" max="1.2" step="0.01" value="1">
       </label>
+      <p class="hint">Shoulders change the drawn body only. The eyes stay on the seat centerline, so the mirrors do not move.</p>
       <label>Seatback <output id="seatback-val">22°</output>
         <input id="seatback" type="range" min="15" max="30" value="22">
       </label>
@@ -186,6 +195,9 @@
         <div class="mirror"><b>Right side</b><div class="stat"><span>Pan</span><b id="out-right-pan">—</b></div><div class="stat"><span>Tilt</span><b id="out-right-tilt">—</b></div></div>
       </div>
       <div class="stat"><span>Reflection error</span><b id="out-error">—</b></div>
+      <div class="stat"><span>Left pan vs 175 cm</span><b id="out-delta-left">—</b></div>
+      <div class="stat"><span>Right pan vs 175 cm</span><b id="out-delta-right">—</b></div>
+      <div class="stat"><span>Rear tilt vs 175 cm</span><b id="out-delta-rear">—</b></div>
       <details>
         <summary>Vectors</summary>
         <pre id="raw"></pre>
